@@ -80,6 +80,7 @@ jobs:
               exit 1
             fi
             echo "parsed imageId: $IMAGE_ID"
+            echo "$UPLOAD_JSON" > "$HOME/plaque/upload_response.json"
             echo "== E2E: get analysis =="
             ANALYSIS_JSON=$(curl -sS -m 60 http://localhost/api/upload/analysis/$IMAGE_ID)
             echo "$ANALYSIS_JSON" | sed 's/\n//g' | head -c 600
@@ -93,8 +94,22 @@ jobs:
           port: 22
           source: "$HOME/plaque/analysis_result.json"
           target: "./"
+      - name: Download upload_response.json
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          source: "$HOME/plaque/upload_response.json"
+          target: "./"
       - name: Upload analysis artifact
         uses: actions/upload-artifact@v4
         with:
           name: analysis_result.json
           path: analysis_result.json
+      - name: Upload upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload_response.json
+          path: upload_response.json
