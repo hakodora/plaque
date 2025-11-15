@@ -55,3 +55,29 @@ jobs:
             echo "== test evolution ping/status =="
             sudo docker compose exec -T frontend sh -lc "curl -sS -m 10 -D - http://backend:3001/api/evolution/ping" || true
             sudo docker compose exec -T frontend sh -lc "curl -sS -m 10 http://backend:3001/api/evolution/status" || true
+      - name: E2E upload and analysis test
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          script: |
+            set -euo pipefail
+            cd "$HOME/plaque"
+            if [ ! -f t1.png ]; then
+              echo "t1.png not found in repo root"
+              exit 1
+            fi
+            echo "== E2E: upload image =="
+            UPLOAD_JSON=$(curl -sS -m 40 -F "image=@t1.png" http://localhost/api/upload/upload)
+            echo "$UPLOAD_JSON" | sed 's/\n//g' | head -c 300
+            IMAGE_ID=$(echo "$UPLOAD_JSON" | sed -n 's/.*"imageId":"\([^"]*\)".*/\1/p')
+            if [ -z "$IMAGE_ID" ]; then
+              echo "failed to parse imageId"
+              exit 1
+            fi
+            echo "parsed imageId: $IMAGE_ID"
+            echo "== E2E: get analysis =="
+            ANALYSIS_JSON=$(curl -sS -m 60 http://localhost/api/upload/analysis/$IMAGE_ID)
+            echo "$ANALYSIS_JSON" | sed 's/\n//g' | head -c 600
