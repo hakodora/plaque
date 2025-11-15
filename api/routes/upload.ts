@@ -7,6 +7,7 @@ import { ToothDetectionService } from '../services/detection.js';
 import { DiseaseAnalysisService } from '../services/diseaseAnalysis.js';
 
 const router = express.Router();
+const imageStore = new Map<string, Buffer>();
 const detectionService = new ToothDetectionService();
 const diseaseAnalysisService = new DiseaseAnalysisService();
 
@@ -31,6 +32,7 @@ const upload = multer({
 async function preprocessImage(buffer: Buffer): Promise<{
   original: string;
   processed: string;
+  processedBuffer: Buffer;
   metadata: any;
 }> {
   try {
@@ -54,6 +56,7 @@ async function preprocessImage(buffer: Buffer): Promise<{
     return {
       original: originalBase64,
       processed: processedBase64,
+      processedBuffer,
       metadata: {
         originalWidth: metadata.width,
         originalHeight: metadata.height,
@@ -111,6 +114,7 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     
     // 生成唯一的图像ID
     const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    imageStore.set(imageId, processedResult.processedBuffer);
     
     res.json({
       success: true,
@@ -137,33 +141,26 @@ router.post('/upload', upload.single('image'), async (req, res) => {
 router.get('/analysis/:imageId', async (req, res) => {
   try {
     const { imageId } = req.params;
-    
-    // 这里应该查询数据库获取分析结果
-    // 现在使用AI服务生成分析结果
-    
-    // 生成模拟的图像数据（在实际应用中应该从存储中获取）
-    const mockImageData = {
-      data: new Uint8ClampedArray(512 * 512 * 4).fill(200), // 模拟图像数据
-      width: 512,
-      height: 512
-    } as ImageData;
-    
-    // 执行牙齿检测
-    const detection = await detectionService.detectTeeth(Buffer.from(''));
-    
-    // 执行疾病分析
-    const diseaseAnalysis = await diseaseAnalysisService.analyzeDisease(
-      mockImageData, 
-      detection.teeth
-    );
+    const stored = imageStore.get(imageId);
+    if (!stored) {
+      return res.status(404).json({ success: false, error: '未找到图像，请重新上传' });
+    }
+    // 执行牙齿检测（真实图像）
+    const detection = await detectionService.detectTeeth(stored);
+    // 将图像转换为 ImageData 供疾病分析使用
+    const sharpImage = sharp(stored);
+    const { data: rawData, info } = await sharpImage.raw().toBuffer({ resolveWithObject: true });
+    const imageData = new ImageData(new Uint8ClampedArray(rawData), info.width, info.height);
+    // 执行疾病分析（真实图像）
+    const diseaseAnalysis = await diseaseAnalysisService.analyzeDisease(imageData, detection.teeth);
     
     // 组合分析结果
     const analysisResult = {
       imageId,
       segmentation: {
         teethCount: detection.segmentation.teethCount,
-        gumArea: detection.segmentation.gumArea,
-        segmentationMask: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' // 模拟分割掩码
+        gumArea: Math.round(detection.segmentation.gumArea * 10) / 10,
+        segmentationMask: ''
       },
       teethDetection: detection.teeth,
       diseaseAnalysis: diseaseAnalysis,
@@ -177,54 +174,7 @@ router.get('/analysis/:imageId', async (req, res) => {
     
   } catch (error) {
     console.error('获取分析结果错误:', error);
-    
-    // 如果AI服务失败，返回模拟数据
-    const mockAnalysisResult = {
-      imageId: req.params.imageId,
-      segmentation: {
-        teethCount: 28,
-        gumArea: 85.6,
-        segmentationMask: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
-      },
-      teethDetection: [
-        {
-          id: 'tooth_1',
-          number: '11',
-          name: '右上中切牙',
-          position: { x: 120, y: 200, width: 45, height: 60 },
-          confidence: 0.95,
-          condition: 'healthy'
-        },
-        {
-          id: 'tooth_2',
-          number: '12',
-          name: '右上侧切牙',
-          position: { x: 180, y: 195, width: 42, height: 58 },
-          confidence: 0.92,
-          condition: 'plaque'
-        }
-      ],
-      diseaseAnalysis: {
-        plaqueLevel: 'moderate',
-        plaquePercentage: 35.2,
-        cariesRisk: 'low',
-        tartarLevel: 'minimal',
-        gumInflammation: 'mild',
-        overallScore: 7.2,
-        recommendations: [
-          '建议每天刷牙两次，使用含氟牙膏',
-          '使用牙线清洁牙缝',
-          '定期进行口腔检查'
-        ],
-        riskFactors: ['牙菌斑堆积', '轻微牙龈炎症']
-      },
-      timestamp: new Date().toISOString()
-    };
-    
-    res.json({
-      success: true,
-      data: mockAnalysisResult
-    });
+    res.status(500).json({ success: false, error: '分析失败', message: (error as Error).message });
   }
 });
 

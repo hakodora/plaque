@@ -79,6 +79,41 @@ export class DiseaseAnalysisService {
         }
       }
     });
+
+    // 回退：无牙齿检测结果时，基于全图进行颜色分析
+    if (!teethDetection || teethDetection.length === 0) {
+      let sumYellow = 0;
+      let sumSqYellow = 0;
+      const totalPixels = width * height;
+      for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++) {
+          const idx = (py * width + px) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const yellowScore = (r + g) / 2 - b;
+          sumYellow += yellowScore;
+          sumSqYellow += yellowScore * yellowScore;
+        }
+      }
+      const mean = sumYellow / totalPixels;
+      const variance = Math.max(sumSqYellow / totalPixels - mean * mean, 0);
+      const std = Math.sqrt(variance);
+      const threshold = mean + std; // 动态阈值：高于均值一个标准差视为偏黄
+      for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++) {
+          const idx = (py * width + px) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const yellowScore = (r + g) / 2 - b;
+          totalTeethPixels++;
+          if (yellowScore > threshold && r > 120 && g > 120) {
+            plaquePixels++;
+          }
+        }
+      }
+    }
     
     const percentage = totalTeethPixels > 0 ? (plaquePixels / totalTeethPixels) * 100 : 0;
     
