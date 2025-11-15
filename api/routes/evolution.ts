@@ -71,35 +71,29 @@ function setupEventListeners() {
 }
 
 // 启动进化系统
-router.post('/start', async (req, res) => {
+router.post('/start', (req, res) => {
   try {
-    initializeEvolutionSystem();
-    if (evolutionManager) {
-      setImmediate(async () => {
-        try {
-          await evolutionManager!.startEvolution();
-        } catch (err) {
-          console.error('Error starting evolution system:', err);
+    res.status(202).json({
+      success: true,
+      message: 'Evolution start accepted',
+      timestamp: new Date().toISOString()
+    });
+
+    setImmediate(async () => {
+      try {
+        initializeEvolutionSystem();
+        if (evolutionManager) {
+          await evolutionManager.startEvolution();
+        } else {
+          console.error('Failed to initialize evolution system');
         }
-      });
-      res.status(202).json({
-        success: true,
-        message: 'Evolution start accepted',
-        timestamp: new Date().toISOString()
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to initialize evolution system'
-      });
-    }
+      } catch (err) {
+        console.error('Error starting evolution system:', err);
+      }
+    });
   } catch (error) {
     console.error('Error starting evolution system:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error starting evolution system',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    // do not re-send response; it has been accepted already
   }
 });
 
