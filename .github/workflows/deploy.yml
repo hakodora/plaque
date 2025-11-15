@@ -29,10 +29,12 @@ jobs:
             fi
             # clone or pull
             if [ ! -d "$HOME/plaque" ]; then
-              git clone https://github.com/hakodora/plaque.git "$HOME/plaque"
+              git clone https://github.com/hakodora/plaque.git "$HOME/plaque" || {
+                echo "git clone failed, retrying in 5s"; sleep 5; git clone https://github.com/hakodora/plaque.git "$HOME/plaque";
+              }
             fi
             cd "$HOME/plaque"
-            git pull
+            git pull || { echo "git pull failed, retrying"; sleep 5; git pull; }
             # build & start
             sudo docker compose up -d --build
             sudo docker compose ps
