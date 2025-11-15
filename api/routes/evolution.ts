@@ -97,6 +97,11 @@ router.post('/start', (req, res) => {
   }
 });
 
+// 快速连通性测试
+router.get('/ping', (req, res) => {
+  res.json({ success: true, message: 'pong', timestamp: new Date().toISOString() });
+});
+
 // 停止进化系统
 router.post('/stop', async (req, res) => {
   try {
