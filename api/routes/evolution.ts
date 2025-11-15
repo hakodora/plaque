@@ -74,12 +74,17 @@ function setupEventListeners() {
 router.post('/start', async (req, res) => {
   try {
     initializeEvolutionSystem();
-    
     if (evolutionManager) {
-      await evolutionManager.startEvolution();
-      res.json({
+      setImmediate(async () => {
+        try {
+          await evolutionManager!.startEvolution();
+        } catch (err) {
+          console.error('Error starting evolution system:', err);
+        }
+      });
+      res.status(202).json({
         success: true,
-        message: 'Evolution system started successfully',
+        message: 'Evolution start accepted',
         timestamp: new Date().toISOString()
       });
     } else {

@@ -61,8 +61,13 @@ export default function SelfEvolutionPage() {
         setIsEvolutionRunning(true);
         await fetchEvolutionStatus();
       } else {
-        const errorData = await response.json();
-        setError(errorData.message || '启动进化系统失败');
+        const text = await response.text();
+        try {
+          const errorData = JSON.parse(text);
+          setError(errorData.message || '启动进化系统失败');
+        } catch {
+          setError(`启动进化系统失败: ${response.status}`);
+        }
       }
     } catch (error) {
       console.error('Error starting evolution:', error);
