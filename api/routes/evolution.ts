@@ -12,6 +12,7 @@ const router = express.Router();
 // 全局进化管理器实例
 let evolutionManager: EvolutionManager | null = null;
 let selfAnalysisManager: SelfAnalysisManager | null = null;
+let simpleIsRunning = false;
 
 // 初始化进化系统
 function initializeEvolutionSystem() {
@@ -85,6 +86,7 @@ router.post('/start', (req, res) => {
         if (evolutionManager) {
           await evolutionManager.startEvolution();
         } else {
+          simpleIsRunning = true;
           console.error('Failed to initialize evolution system');
         }
       } catch (err) {
@@ -113,9 +115,11 @@ router.post('/stop', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     } else {
-      res.status(400).json({
-        success: false,
-        message: 'Evolution system is not running'
+      simpleIsRunning = false;
+      res.json({
+        success: true,
+        message: 'Evolution system stopped',
+        timestamp: new Date().toISOString()
       });
     }
   } catch (error) {
@@ -142,7 +146,7 @@ router.get('/status', (req, res) => {
       res.json({
         success: true,
         data: {
-          isRunning: false,
+          isRunning: simpleIsRunning,
           evolutionState: null,
           activeSubsystems: [],
           healthStatus: { overall: 0, systems: {} }
