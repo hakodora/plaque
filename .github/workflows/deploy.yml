@@ -48,3 +48,10 @@ jobs:
               echo "== backend logs after restart =="
               sudo docker compose logs backend --tail 200 || true
             fi
+            echo "== in-network health from frontend container =="
+            sudo docker compose exec -T frontend sh -lc "curl -sS -m 10 -D - http://backend:3001/api/health" || true
+            echo "== in-container health inside backend =="
+            sudo docker compose exec -T backend sh -lc "curl -sS -m 10 -D - http://localhost:3001/api/health" || true
+            echo "== test evolution ping/status =="
+            sudo docker compose exec -T frontend sh -lc "curl -sS -m 10 -D - http://backend:3001/api/evolution/ping" || true
+            sudo docker compose exec -T frontend sh -lc "curl -sS -m 10 http://backend:3001/api/evolution/status" || true
