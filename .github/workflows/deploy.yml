@@ -41,9 +41,38 @@ jobs:
               echo "docker compose/docker-compose 不可用或无执行权限"
               exit 1
             fi
-            $COMPOSE down || true
-            $COMPOSE build --no-cache
-            $COMPOSE up -d
+            PASSWORD="${{ secrets.SERVER_SUDO_PASSWORD }}"
+            if [ -z "$PASSWORD" ]; then
+              PASSWORD="${{ secrets.SERVER_PASSWORD }}"
+            fi
+            if sudo -n true 2>/dev/null; then
+              SUDO_MODE="noninteractive"
+            else
+              SUDO_MODE="password"
+            fi
+            run_compose() {
+              if [ "$SUDO_MODE" = "noninteractive" ]; then
+                sudo -n $COMPOSE "$@"
+              else
+                if [ -n "$PASSWORD" ]; then
+                  echo "$PASSWORD" | sudo -S $COMPOSE "$@"
+                else
+                  $COMPOSE "$@"
+                fi
+              fi
+            }
+            if ! docker info >/dev/null 2>&1; then
+              if [ "$SUDO_MODE" = "noninteractive" ]; then
+                sudo -n systemctl start docker || sudo -n service docker start || true
+              else
+                if [ -n "$PASSWORD" ]; then
+                  echo "$PASSWORD" | sudo -S systemctl start docker || echo "$PASSWORD" | sudo -S service docker start || true
+                fi
+              fi
+            fi
+            run_compose down || true
+            run_compose build --no-cache
+            run_compose up -d
             for i in $(seq 1 20); do
               if curl -sf http://localhost/api/health >/dev/null 2>&1; then
                 break
@@ -51,7 +80,7 @@ jobs:
               sleep 3
             done
             echo "== Backend logs (last 80 lines) =="
-            $COMPOSE logs --tail=80 backend || true
+            run_compose logs --tail=80 backend || true
 
       - name: E2E upload and analysis
         uses: appleboy/ssh-action@v1.0.0
