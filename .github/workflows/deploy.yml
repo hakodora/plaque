@@ -7,8 +7,39 @@ on:
   workflow_dispatch:
 
 jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npm run check
+      - name: Lint (non-blocking)
+        run: |
+          npm run lint | tee lint.txt || true
+      - name: Summarize Precheck
+        run: |
+          echo "## 预检摘要" >> $GITHUB_STEP_SUMMARY
+          echo "- 类型检查: 通过" >> $GITHUB_STEP_SUMMARY
+          if [ -f lint.txt ]; then
+            ERRORS=$(grep -E "\berror\b" lint.txt | wc -l || echo 0)
+            WARNINGS=$(grep -E "\bwarning\b" lint.txt | wc -l || echo 0)
+            echo "- Lint 错误行: ${ERRORS}" >> $GITHUB_STEP_SUMMARY
+            echo "- Lint 警告行: ${WARNINGS}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Lint 输出不存在" >> $GITHUB_STEP_SUMMARY
+          fi
+
   deploy:
     runs-on: ubuntu-latest
+    needs: precheck
     steps:
       - name: Checkout
         uses: actions/checkout@v4
