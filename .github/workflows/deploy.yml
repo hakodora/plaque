@@ -42,6 +42,8 @@ jobs:
               fi
               sleep 3
             done
+            echo "== Backend logs (last 80 lines) =="
+            docker-compose logs --tail=80 backend || true
 
       - name: E2E upload and analysis
         uses: appleboy/ssh-action@v1.0.0
@@ -94,3 +96,27 @@ jobs:
           path: |
             upload_response.json
             analysis_result.json
+
+      - name: Summarize E2E results
+        run: |
+          set -euo pipefail
+          sudo apt-get update >/dev/null 2>&1 || true
+          sudo apt-get install -y jq >/dev/null 2>&1 || true
+          echo "## 部署与E2E摘要" >> $GITHUB_STEP_SUMMARY
+          if [ -f upload_response.json ]; then
+            IMAGE_ID=$(jq -r '.data.imageId // .imageId // empty' upload_response.json)
+            echo "- imageId: ${IMAGE_ID}" >> $GITHUB_STEP_SUMMARY
+            echo "- upload_response.json: 大小 $(wc -c < upload_response.json) 字节" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- upload_response.json 不存在" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -f analysis_result.json ]; then
+            TEETH_COUNT=$(jq -r '.teethDetection | length' analysis_result.json)
+            OVERALL_SCORE=$(jq -r '.diseaseAnalysis.overallScore // empty' analysis_result.json)
+            PLAQUE_PERCENT=$(jq -r '.diseaseAnalysis.plaquePercentage // empty' analysis_result.json)
+            echo "- 检测牙齿数量: ${TEETH_COUNT}" >> $GITHUB_STEP_SUMMARY
+            echo "- 综合评分(overallScore): ${OVERALL_SCORE}" >> $GITHUB_STEP_SUMMARY
+            echo "- 牙菌斑比例(plaquePercentage): ${PLAQUE_PERCENT}%" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- analysis_result.json 不存在" >> $GITHUB_STEP_SUMMARY
+          fi
