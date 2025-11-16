@@ -20,9 +20,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: 22
-          source: "./"
+          source: "**/*,!**/.git/**,!**/node_modules/**"
           target: "~/plaque/"
-          direction: "upload"
           overwrite: true
 
       - name: Build and restart services
@@ -126,29 +125,7 @@ jobs:
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -P 22 -o StrictHostKeyChecking=no "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/plaque/upload_response.json" ./ || true
           sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -P 22 -o StrictHostKeyChecking=no "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/plaque/analysis_result.json" ./ || true
 
-      - name: Download upload_response.json
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: 22
-          source: "~/plaque/upload_response.json"
-          target: "./"
-          direction: "download"
-          overwrite: true
-
-      - name: Download analysis_result.json
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: 22
-          source: "~/plaque/analysis_result.json"
-          target: "./"
-          direction: "download"
-          overwrite: true
+      # Removed scp-action download steps. Use sshpass scp in previous step to fetch results.
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
