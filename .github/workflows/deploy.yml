@@ -94,9 +94,17 @@ jobs:
             cd "$HOME/plaque"
             if [ ! -f t1.png ]; then
               echo "t1.png not found, downloading a sample image..."
-              curl -L -o t1.png "https://via.placeholder.com/1280x960.png?text=dental+sample" || {
-                echo "failed to download sample image" && exit 1;
-              }
+              if command -v curl >/dev/null 2>&1; then
+                curl -L -o t1.png "https://via.placeholder.com/1280x960.png?text=dental+sample" || {
+                  echo "failed to download sample image with curl" && exit 1;
+                }
+              elif command -v wget >/dev/null 2>&1; then
+                wget -O t1.png "https://via.placeholder.com/1280x960.png?text=dental+sample" || {
+                  echo "failed to download sample image with wget" && exit 1;
+                }
+              else
+                echo "no curl or wget available to download sample image" && exit 1
+              fi
             fi
             UPLOAD_JSON=$(curl -sS -m 60 -F "image=@t1.png" http://localhost/api/upload/upload)
             echo "$UPLOAD_JSON" > "$HOME/plaque/upload_response.json"
