@@ -93,8 +93,10 @@ jobs:
             set -euo pipefail
             cd "$HOME/plaque"
             if [ ! -f t1.png ]; then
-              echo "t1.png not found in repo root"
-              exit 1
+              echo "t1.png not found, downloading a sample image..."
+              curl -L -o t1.png "https://via.placeholder.com/1280x960.png?text=dental+sample" || {
+                echo "failed to download sample image" && exit 1;
+              }
             fi
             UPLOAD_JSON=$(curl -sS -m 60 -F "image=@t1.png" http://localhost/api/upload/upload)
             echo "$UPLOAD_JSON" > "$HOME/plaque/upload_response.json"
