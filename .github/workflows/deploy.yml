@@ -118,6 +118,14 @@ jobs:
             ANALYSIS_JSON=$(curl -sS -m 120 http://localhost/api/upload/analysis/$IMAGE_ID)
             echo "$ANALYSIS_JSON" > "$HOME/plaque/analysis_result.json"
 
+      - name: Fetch E2E results
+        run: |
+          set -euo pipefail
+          sudo apt-get update >/dev/null 2>&1 || true
+          sudo apt-get install -y sshpass >/dev/null 2>&1 || true
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -P 22 -o StrictHostKeyChecking=no "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/plaque/upload_response.json" ./ || true
+          sshpass -p "${{ secrets.SERVER_PASSWORD }}" scp -P 22 -o StrictHostKeyChecking=no "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/plaque/analysis_result.json" ./ || true
+
       - name: Download upload_response.json
         uses: appleboy/scp-action@v0.1.7
         with:
