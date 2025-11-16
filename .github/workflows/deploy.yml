@@ -33,9 +33,17 @@ jobs:
           script: |
             set -euo pipefail
             cd "$HOME/plaque"
-            docker-compose down || true
-            docker-compose build --no-cache
-            docker-compose up -d
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE="docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE="docker-compose"
+            else
+              echo "docker compose/docker-compose 不可用或无执行权限"
+              exit 1
+            fi
+            $COMPOSE down || true
+            $COMPOSE build --no-cache
+            $COMPOSE up -d
             for i in $(seq 1 20); do
               if curl -sf http://localhost/api/health >/dev/null 2>&1; then
                 break
@@ -43,7 +51,7 @@ jobs:
               sleep 3
             done
             echo "== Backend logs (last 80 lines) =="
-            docker-compose logs --tail=80 backend || true
+            $COMPOSE logs --tail=80 backend || true
 
       - name: E2E upload and analysis
         uses: appleboy/ssh-action@v1.0.0
