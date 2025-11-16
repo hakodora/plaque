@@ -21,6 +21,7 @@ export interface ModelPerformance {
   confidence: number;
   memoryUsage: number;
   predictions: number;
+  timestamp: number;
 }
 
 export interface AnalysisResult {

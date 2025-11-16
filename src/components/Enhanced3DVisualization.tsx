@@ -139,6 +139,20 @@ export default function Enhanced3DVisualization({
     }
   }, [viewMode, colorScheme, showLabels, showGrid, segmentationData, teethData]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (!mountRef.current || !rendererRef.current || !cameraRef.current || !labelRendererRef.current) return;
+      const width = mountRef.current.clientWidth;
+      const height = mountRef.current.clientHeight;
+      rendererRef.current.setSize(width, height);
+      labelRendererRef.current.setSize(width, height);
+      cameraRef.current.aspect = width / height;
+      cameraRef.current.updateProjectionMatrix();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const setupAdvancedLighting = (scene: THREE.Scene) => {
     // 清除现有灯光
     const lightsToRemove = scene.children.filter(child => child instanceof THREE.Light);
@@ -534,7 +548,7 @@ export default function Enhanced3DVisualization({
     setSelectedTooth(selectedTooth === toothId ? null : toothId);
   };
 
-  const handleMouseMove = useCallback((event: MouseEvent) => {
+  const handleMouseMove = useCallback((event: React.MouseEvent) => {
     if (!cameraRef.current || !sceneRef.current) return;
     
     const rect = mountRef.current?.getBoundingClientRect();

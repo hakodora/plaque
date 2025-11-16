@@ -188,8 +188,10 @@ export class RealTimeFeedbackSystem extends EventEmitter {
 
     // 检查系统整体性能
     if (performanceReport.operations) {
-      const avgResponseTime = Object.values(performanceReport.operations as any)
-        .reduce((sum: number, op: any) => sum + op.avgDuration, 0) / Object.keys(performanceReport.operations).length;
+      const ops = Object.values(performanceReport.operations as Record<string, any>);
+      const count = Math.max(1, ops.length);
+      const total = ops.reduce((sum: number, op: any) => sum + Number(op?.avgDuration || 0), 0);
+      const avgResponseTime = total / count;
 
       if (avgResponseTime > 1000) { // 超过1秒
         this.addFeedbackMessage({
@@ -376,6 +378,10 @@ export class RealTimeFeedbackSystem extends EventEmitter {
     }
 
     this.emit('new-feedback', message);
+  }
+
+  public publishFeedbackMessage(message: FeedbackMessage): void {
+    this.addFeedbackMessage(message);
   }
 
   private addOptimizationSuggestion(suggestion: OptimizationSuggestion): void {

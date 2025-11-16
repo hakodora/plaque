@@ -39,12 +39,12 @@ export class ToothSegmentation {
     const input = tf.input({ shape: [this.IMAGE_SIZE, this.IMAGE_SIZE, 3] });
     
     // 简单的卷积网络用于演示
-    const conv1 = tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu', padding: 'same' }).apply(input);
-    const conv2 = tf.layers.conv2d({ filters: 128, kernelSize: 3, activation: 'relu', padding: 'same' }).apply(conv1);
-    const conv3 = tf.layers.conv2d({ filters: 256, kernelSize: 3, activation: 'relu', padding: 'same' }).apply(conv2);
+    const conv1 = tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu', padding: 'same' }).apply(input) as tf.SymbolicTensor;
+    const conv2 = tf.layers.conv2d({ filters: 128, kernelSize: 3, activation: 'relu', padding: 'same' }).apply(conv1) as tf.SymbolicTensor;
+    const conv3 = tf.layers.conv2d({ filters: 256, kernelSize: 3, activation: 'relu', padding: 'same' }).apply(conv2) as tf.SymbolicTensor;
     
     // 输出层 - 3个类别：背景、牙齿、牙龈
-    const output = tf.layers.conv2d({ filters: 3, kernelSize: 1, activation: 'softmax', padding: 'same' }).apply(conv3);
+    const output = tf.layers.conv2d({ filters: 3, kernelSize: 1, activation: 'softmax', padding: 'same' }).apply(conv3) as tf.SymbolicTensor;
     
     const model = tf.model({ inputs: input, outputs: output });
     

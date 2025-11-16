@@ -84,7 +84,7 @@ export class SelfAnalysisManager extends EventEmitter {
     this.performanceMonitor = new PerformanceMonitor();
     
     // 初始化模型评估服务
-    this.modelEvaluator = new ModelEvaluationService();
+    this.modelEvaluator = new ModelEvaluationService(this.performanceMonitor);
     
     // 初始化实时反馈系统
     this.feedbackSystem = new RealTimeFeedbackSystem(
@@ -174,10 +174,10 @@ export class SelfAnalysisManager extends EventEmitter {
       this.emit('self-analysis-started');
 
       // 添加启动成功的反馈
-      this.feedbackSystem.addFeedbackMessage({
+      this.feedbackSystem.publishFeedbackMessage({
         id: `self-analysis-started-${Date.now()}`,
         type: 'info',
-        category: 'system',
+        category: 'performance',
         title: '自我分析系统启动',
         message: '所有子系统已成功启动，开始智能监控和优化',
         timestamp: new Date(),
@@ -221,10 +221,10 @@ export class SelfAnalysisManager extends EventEmitter {
     this.emit('self-analysis-stopped');
 
     // 添加停止成功的反馈
-    this.feedbackSystem.addFeedbackMessage({
+    this.feedbackSystem.publishFeedbackMessage({
       id: `self-analysis-stopped-${Date.now()}`,
       type: 'info',
-      category: 'system',
+      category: 'performance',
       title: '自我分析系统停止',
       message: '所有子系统已停止运行',
       timestamp: new Date(),
@@ -274,7 +274,12 @@ export class SelfAnalysisManager extends EventEmitter {
           status: this.continuousLearning ? 'active' : 'inactive'
         }
       },
-      health: feedbackHealth
+      health: {
+        overall: feedbackHealth.status,
+        score: feedbackHealth.score,
+        issues: feedbackHealth.issues,
+        recommendations: feedbackHealth.recommendations
+      }
     };
   }
 
@@ -327,9 +332,13 @@ export class SelfAnalysisManager extends EventEmitter {
       learningSamples: learningStats.totalSamples,
       modelUpdates: learningStats.modelUpdates,
       performanceMetrics: {
-        avgResponseTime: performanceStats?.operations ? 
-          Object.values(performanceStats.operations as any)
-            .reduce((sum: number, op: any) => sum + op.avgDuration, 0) / Object.keys(performanceStats.operations).length : 0,
+        avgResponseTime: performanceStats?.operations ?
+          (() => {
+            const durations = Object.values(performanceStats.operations as Record<string, any>);
+            const total = (durations as any[]).reduce((sum: number, op: any) => sum + Number(op?.avgDuration || 0), 0);
+            const count = Math.max(1, Object.keys(performanceStats.operations).length);
+            return total / count;
+          })() : 0,
         avgMemoryUsage: performanceStats?.models?.avgMemoryUsage || 0,
         avgAccuracy: performanceStats?.models?.avgAccuracy || 0
       },

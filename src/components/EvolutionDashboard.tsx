@@ -61,6 +61,7 @@ interface SystemStatus {
   performanceTrend: 'improving' | 'declining' | 'stable';
   improvementStreak: number;
   stagnationCount: number;
+  totalExperiences?: number;
 }
 
 export default function EvolutionDashboard({ 

@@ -1,18 +1,29 @@
-name: Deploy to Cloud Server
+name: deploy-and-e2e
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy over SSH
+      - name: Copy repo to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          source: "./"
+          target: "$HOME/plaque/"
+
+      - name: Build and restart services
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -21,43 +32,18 @@ jobs:
           port: 22
           script: |
             set -euo pipefail
-            # install docker & compose and curl if missing
-            if ! command -v docker >/dev/null 2>&1; then
-              sudo apt update
-              sudo apt install -y docker.io docker-compose-plugin git curl
-              sudo systemctl enable --now docker
-            fi
-            # clone or pull
-            if [ ! -d "$HOME/plaque" ]; then
-              git clone https://github.com/hakodora/plaque.git "$HOME/plaque" || {
-                echo "git clone failed, retrying in 5s"; sleep 5; git clone https://github.com/hakodora/plaque.git "$HOME/plaque";
-              }
-            fi
             cd "$HOME/plaque"
-            git pull || { echo "git pull failed, retrying"; sleep 5; git pull; }
-            # build & start
-            sudo docker compose up -d --build
-            sudo docker compose ps
-            # diagnostics: backend logs and health
-            echo "== backend logs (tail 200) =="
-            sudo docker compose logs backend --tail 200 || true
-            echo "== curl health =="
-            if ! curl -sS -m 20 -D - http://localhost/api/health; then
-              echo "health check failed, restarting backend"
-              sudo docker compose restart backend
-              sleep 10
-              curl -sS -m 20 -D - http://localhost/api/health || true
-              echo "== backend logs after restart =="
-              sudo docker compose logs backend --tail 200 || true
-            fi
-            echo "== in-network health from frontend container =="
-            sudo docker compose exec -T frontend sh -lc "curl -sS -m 10 -D - http://backend:3001/api/health" || true
-            echo "== in-container health inside backend =="
-            sudo docker compose exec -T backend sh -lc "curl -sS -m 10 -D - http://localhost:3001/api/health" || true
-            echo "== test evolution ping/status =="
-            sudo docker compose exec -T frontend sh -lc "curl -sS -m 10 -D - http://backend:3001/api/evolution/ping" || true
-            sudo docker compose exec -T frontend sh -lc "curl -sS -m 10 http://backend:3001/api/evolution/status" || true
-      - name: E2E upload and analysis test
+            docker-compose down || true
+            docker-compose build --no-cache
+            docker-compose up -d
+            for i in $(seq 1 20); do
+              if curl -sf http://localhost/api/health >/dev/null 2>&1; then
+                break
+              fi
+              sleep 3
+            done
+
+      - name: E2E upload and analysis
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -71,29 +57,16 @@ jobs:
               echo "t1.png not found in repo root"
               exit 1
             fi
-            echo "== E2E: upload image =="
-            UPLOAD_JSON=$(curl -sS -m 40 -F "image=@t1.png" http://localhost/api/upload/upload)
-            echo "$UPLOAD_JSON" | sed 's/\n//g' | head -c 300
+            UPLOAD_JSON=$(curl -sS -m 60 -F "image=@t1.png" http://localhost/api/upload/upload)
+            echo "$UPLOAD_JSON" > "$HOME/plaque/upload_response.json"
             IMAGE_ID=$(echo "$UPLOAD_JSON" | sed -n 's/.*"imageId":"\([^"]*\)".*/\1/p')
             if [ -z "$IMAGE_ID" ]; then
               echo "failed to parse imageId"
               exit 1
             fi
-            echo "parsed imageId: $IMAGE_ID"
-            echo "$UPLOAD_JSON" > "$HOME/plaque/upload_response.json"
-            echo "== E2E: get analysis =="
-            ANALYSIS_JSON=$(curl -sS -m 60 http://localhost/api/upload/analysis/$IMAGE_ID)
-            echo "$ANALYSIS_JSON" | sed 's/\n//g' | head -c 600
+            ANALYSIS_JSON=$(curl -sS -m 120 http://localhost/api/upload/analysis/$IMAGE_ID)
             echo "$ANALYSIS_JSON" > "$HOME/plaque/analysis_result.json"
-      - name: Download analysis_result.json
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: 22
-          source: "$HOME/plaque/analysis_result.json"
-          target: "./"
+
       - name: Download upload_response.json
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -103,13 +76,21 @@ jobs:
           port: 22
           source: "$HOME/plaque/upload_response.json"
           target: "./"
-      - name: Upload analysis artifact
+
+      - name: Download analysis_result.json
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          source: "$HOME/plaque/analysis_result.json"
+          target: "./"
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: analysis_result.json
-          path: analysis_result.json
-      - name: Upload upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: upload_response.json
-          path: upload_response.json
+          name: e2e-results
+          path: |
+            upload_response.json
+            analysis_result.json

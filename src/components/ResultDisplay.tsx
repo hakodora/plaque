@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AlertCircle, CheckCircle, Info } from 'lucide-react';
+import Enhanced3DVisualization from './Enhanced3DVisualization';
 
 interface AnalysisResult {
   imageId: string;
@@ -34,7 +35,7 @@ interface ResultDisplayProps {
 }
 
 export default function ResultDisplay({ result, originalImage, processedImage }: ResultDisplayProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'teeth' | 'disease'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'teeth' | 'disease' | 'visualization'>('visualization');
 
   const getScoreColor = (score: number) => {
     if (score >= 8) return 'text-green-600';
@@ -110,7 +111,8 @@ export default function ResultDisplay({ result, originalImage, processedImage }:
             {[
               { id: 'overview', label: '总览' },
               { id: 'teeth', label: '牙齿检测' },
-              { id: 'disease', label: '疾病分析' }
+              { id: 'disease', label: '疾病分析' },
+              { id: 'visualization', label: '3D可视化' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -251,6 +253,23 @@ export default function ResultDisplay({ result, originalImage, processedImage }:
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'visualization' && (
+            <div className="space-y-6">
+              <h4 className="font-semibold mb-3">3D可视化分析</h4>
+              <Enhanced3DVisualization
+                segmentationData={{ teethMask: [], gumMask: [], boundingBoxes: [] }}
+                teethData={result.teethDetection.map((t) => ({
+                  id: t.id,
+                  number: t.number,
+                  name: t.name,
+                  position: t.position,
+                  confidence: t.confidence,
+                  condition: 'healthy'
+                }))}
+              />
             </div>
           )}
         </div>

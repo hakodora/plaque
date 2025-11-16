@@ -40,6 +40,7 @@ export interface EvolutionState {
   avgFitness: number;
   diversity: number;
   convergence: number;
+  stagnationCount: number;
   activeSystems: string[];
   performanceMetrics: { [key: string]: number };
   recommendations: string[];
@@ -203,6 +204,7 @@ export class EvolutionManager extends EventEmitter {
       avgFitness: 0,
       diversity: 0,
       convergence: 0,
+      stagnationCount: 0,
       activeSystems: [],
       performanceMetrics: {},
       recommendations: []
@@ -361,8 +363,14 @@ export class EvolutionManager extends EventEmitter {
     }
   }
 
-  private async collectSystemStates(): Promise<any> {
-    const states = {};
+  private async collectSystemStates(): Promise<{ selfAnalysis: any; evolution: any; neat: any; adaptiveLearning: any; abTesting: any }> {
+    const states: { selfAnalysis: any; evolution: any; neat: any; adaptiveLearning: any; abTesting: any } = {
+      selfAnalysis: {},
+      evolution: {},
+      neat: {},
+      adaptiveLearning: {},
+      abTesting: {}
+    };
 
     if (this.configuration.enableSelfAnalysis) {
       states.selfAnalysis = this.selfAnalysisManager.getSystemStatus();
@@ -721,7 +729,7 @@ export class EvolutionManager extends EventEmitter {
     return metrics;
   }
 
-  private determineEvolutionPhase(state: Partial<EvolutionState>): string {
+  private determineEvolutionPhase(state: Partial<EvolutionState>): 'initialization' | 'exploration' | 'exploitation' | 'convergence' | 'optimization' {
     const avgFitness = state.avgFitness || this.evolutionState.avgFitness;
     const bestFitness = state.bestFitness || this.evolutionState.bestFitness;
     const diversity = state.diversity || this.evolutionState.diversity;
@@ -745,11 +753,11 @@ export class EvolutionManager extends EventEmitter {
     this.emit('coordination-metrics', metrics);
   }
 
-  private collectMetrics(): void {
+  private async collectMetrics(): Promise<void> {
     const metrics: EvolutionMetrics = {
       timestamp: Date.now(),
       state: { ...this.evolutionState },
-      systemMetrics: this.collectSystemStates(),
+      systemMetrics: await this.collectSystemStates(),
       coordinationMetrics: {
         conflicts: this.conflictLog.length,
         resolutions: this.conflictLog.filter(log => log.resolution).length,

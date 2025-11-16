@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   AlertCircle, CheckCircle, Info, X, Zap, 
-  Clock, TrendingUp, Cpu, Memory, Activity,
+  Clock, TrendingUp, Cpu, Activity, Database,
   Play, Pause, Trash2, Filter, Settings, Bell
 } from 'lucide-react';
 import { FeedbackMessage, OptimizationSuggestion } from '../../api/services/realTimeFeedback';
@@ -153,7 +153,7 @@ export default function RealTimeFeedbackPanel({ feedbackSystem }: RealTimeFeedba
       case 'speed':
         return <Activity className="w-4 h-4" />;
       case 'memory':
-        return <Memory className="w-4 h-4" />;
+        return <Database className="w-4 h-4" />;
       case 'model':
         return <Cpu className="w-4 h-4" />;
       default:

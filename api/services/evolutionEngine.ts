@@ -87,7 +87,7 @@ export class EvolutionEngine extends EventEmitter {
   private isRunning = false;
   private evolutionTimer: NodeJS.Timeout | null = null;
   
-  private readonly configuration: EvolutionConfiguration = {
+  private configuration: EvolutionConfiguration = {
     populationSize: 20,
     mutationRate: 0.1,
     crossoverRate: 0.7,

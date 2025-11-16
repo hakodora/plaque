@@ -9,9 +9,11 @@ export interface DiseaseAnalysis {
   riskFactors: string[];
 }
 
+export interface RawImageData { data: Uint8ClampedArray; width: number; height: number }
+
 export class DiseaseAnalysisService {
   
-  async analyzeDisease(imageData: ImageData, teethDetection: any[]): Promise<DiseaseAnalysis> {
+  async analyzeDisease(imageData: RawImageData, teethDetection: any[]): Promise<DiseaseAnalysis> {
     try {
       // 分析各种口腔疾病风险
       const plaqueAnalysis = this.analyzePlaque(imageData, teethDetection);
@@ -44,7 +46,7 @@ export class DiseaseAnalysisService {
     }
   }
   
-  private analyzePlaque(imageData: ImageData, teethDetection: any[]): {
+  private analyzePlaque(imageData: RawImageData, teethDetection: any[]): {
     level: 'low' | 'moderate' | 'high';
     percentage: number;
     severityAreas: number;
@@ -133,7 +135,7 @@ export class DiseaseAnalysisService {
     };
   }
   
-  private analyzeCariesRisk(imageData: ImageData, teethDetection: any[]): {
+  private analyzeCariesRisk(imageData: RawImageData, teethDetection: any[]): {
     risk: 'low' | 'moderate' | 'high';
     riskFactors: string[];
     affectedTeeth: number;
@@ -171,7 +173,7 @@ export class DiseaseAnalysisService {
     return { risk, riskFactors, affectedTeeth };
   }
   
-  private analyzeTartar(imageData: ImageData, teethDetection: any[]): {
+  private analyzeTartar(imageData: RawImageData, teethDetection: any[]): {
     level: 'minimal' | 'moderate' | 'severe';
     severityScore: number;
     location: string[];
@@ -207,7 +209,7 @@ export class DiseaseAnalysisService {
     };
   }
   
-  private analyzeGumHealth(imageData: ImageData, teethDetection: any[]): {
+  private analyzeGumHealth(imageData: RawImageData, teethDetection: any[]): {
     inflammation: 'none' | 'mild' | 'moderate' | 'severe';
     bleedingRisk: 'low' | 'high';
     recession: 'none' | 'mild' | 'moderate';
@@ -350,7 +352,7 @@ export class DiseaseAnalysisService {
   }
   
   // 辅助分析方法
-  private detectColorAnomaly(imageData: ImageData, position: any): boolean {
+  private detectColorAnomaly(imageData: RawImageData, position: any): boolean {
     // 简化的颜色异常检测
     const { data, width } = imageData;
     const { x, y, width: w, height: h } = position;
@@ -375,7 +377,7 @@ export class DiseaseAnalysisService {
     return totalSpots > 0 && (darkSpots / totalSpots) > 0.1;
   }
   
-  private analyzeGumLine(imageData: ImageData, position: any): number {
+  private analyzeGumLine(imageData: RawImageData, position: any): number {
     // 简化的牙龈边缘分析
     const { x, y, width: w, height: h } = position;
     
@@ -385,7 +387,7 @@ export class DiseaseAnalysisService {
     return Math.random() * 10; // 模拟分析结果
   }
   
-  private analyzeGumArea(imageData: ImageData, position: any): {
+  private analyzeGumArea(imageData: RawImageData, position: any): {
     inflammation: boolean;
     swelling: boolean;
   } {

@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import * as tf from '@tensorflow/tfjs';
 import { PerformanceMonitor } from './performanceMonitor';
 import { ModelEvaluationService } from './modelEvaluation';
 import { RealTimeFeedbackSystem } from './realTimeFeedback';
@@ -26,6 +27,9 @@ export interface LearningData {
     trainingIteration: number;
     dataSource: string;
     userFeedback?: number;
+    augmented?: boolean;
+    balanced?: boolean;
+    oversampleRatio?: number;
   };
 }
 
@@ -113,7 +117,7 @@ export class ContinuousLearningSystem extends EventEmitter {
       this.performContinuousLearning();
     }, this.configuration.learningInterval);
 
-    this.feedbackSystem.addFeedbackMessage({
+    this.feedbackSystem.publishFeedbackMessage({
       id: `learning-start-${Date.now()}`,
       type: 'info',
       category: 'model',
@@ -137,7 +141,7 @@ export class ContinuousLearningSystem extends EventEmitter {
 
     this.emit('learning-stopped');
 
-    this.feedbackSystem.addFeedbackMessage({
+    this.feedbackSystem.publishFeedbackMessage({
       id: `learning-stop-${Date.now()}`,
       type: 'info',
       category: 'model',
@@ -171,7 +175,7 @@ export class ContinuousLearningSystem extends EventEmitter {
   }
 
   private async performImmediateLearning(data: LearningData): Promise<void> {
-    this.feedbackSystem.addFeedbackMessage({
+    this.feedbackSystem.publishFeedbackMessage({
       id: `immediate-learning-${Date.now()}`,
       type: 'warning',
       category: 'model',
@@ -225,7 +229,7 @@ export class ContinuousLearningSystem extends EventEmitter {
     } catch (error) {
       this.emit('learning-cycle-failed', error);
       
-      this.feedbackSystem.addFeedbackMessage({
+      this.feedbackSystem.publishFeedbackMessage({
         id: `learning-error-${Date.now()}`,
         type: 'error',
         category: 'model',
@@ -345,49 +349,117 @@ export class ContinuousLearningSystem extends EventEmitter {
   }
 
   private async simulateModelTraining(trainingData: any[], validationData: any[]): Promise<any> {
-    // 模拟训练过程
-    const epochs = 50;
-    const startTime = Date.now();
-
-    // 模拟训练损失
-    const trainingLoss = [];
-    const validationLoss = [];
-
-    for (let epoch = 0; epoch < epochs; epoch++) {
-      const loss = 0.8 * Math.exp(-epoch * 0.1) + Math.random() * 0.1;
-      const valLoss = 0.9 * Math.exp(-epoch * 0.08) + Math.random() * 0.15;
-      
-      trainingLoss.push(loss);
-      validationLoss.push(valLoss);
-
-      // 模拟训练进度
-      if (epoch % 10 === 0) {
-        this.emit('training-progress', {
-          epoch,
-          totalEpochs: epochs,
-          trainingLoss: loss,
-          validationLoss: valLoss
-        });
+    const normalizeInput = (input: any): number[] => {
+      if (Array.isArray(input)) {
+        return input.map((v) => Number(v));
       }
-    }
+      if (typeof input === 'number') {
+        return [input];
+      }
+      throw new Error('无法用于训练的输入数据格式');
+    };
 
+    const trainXArr: number[][] = trainingData.map((d) => normalizeInput(d.input));
+    const trainYArr: (number | number[])[] = trainingData.map((d) => d.actual);
+    const valXArr: number[][] = validationData.map((d) => normalizeInput(d.input));
+    const valYArr: (number | number[])[] = validationData.map((d) => d.actual);
+
+    const featureSize = trainXArr[0]?.length || 1;
+    const isSparse = typeof trainYArr[0] === 'number';
+    const classCount = isSparse
+      ? Math.max(...(trainYArr as number[])) + 1
+      : (trainYArr[0] as number[]).length;
+
+    const model = tf.sequential();
+    model.add(tf.layers.dense({ units: 64, activation: 'relu', inputShape: [featureSize] }));
+    model.add(tf.layers.dense({ units: 32, activation: 'relu' }));
+    model.add(tf.layers.dense({ units: classCount, activation: 'softmax' }));
+
+    model.compile({
+      optimizer: tf.train.adam(this.configuration.learningRate),
+      loss: isSparse ? 'sparseCategoricalCrossentropy' : 'categoricalCrossentropy',
+      metrics: ['accuracy']
+    });
+
+    const trainX = tf.tensor2d(trainXArr);
+    const trainY = isSparse ? tf.tensor1d(trainYArr as number[], 'int32') : tf.tensor2d(trainYArr as number[][]);
+
+    const startTime = Date.now();
+    const history = await model.fit(trainX, trainY, {
+      epochs: 20,
+      validationSplit: 0.1,
+      shuffle: true,
+      verbose: 0
+    });
     const trainingTime = Date.now() - startTime;
 
+    trainX.dispose();
+    trainY.dispose();
+
+    const trainingLoss = (history.history.loss as number[]) || [];
+    const validationLoss = (history.history.val_loss as number[]) || [];
+
     return {
-      epochs,
+      epochs: 20,
       trainingLoss,
       validationLoss,
-      finalTrainingLoss: trainingLoss[trainingLoss.length - 1],
-      finalValidationLoss: validationLoss[validationLoss.length - 1],
-      trainingTime
+      finalTrainingLoss: trainingLoss.slice(-1)[0] || 0,
+      finalValidationLoss: validationLoss.slice(-1)[0] || 0,
+      trainingTime,
+      model
     };
   }
 
   private async validateModel(trainingResult: any): Promise<any> {
     const { validationData, trainingResult: modelResult } = trainingResult;
 
-    // 模拟验证过程
-    const validationMetrics = await this.simulateModelValidation(validationData);
+    const normalizeInput = (input: any): number[] => {
+      if (Array.isArray(input)) return input.map((v) => Number(v));
+      if (typeof input === 'number') return [input];
+      throw new Error('无法用于验证的输入数据格式');
+    };
+
+    const valXArr: number[][] = validationData.map((d: any) => normalizeInput(d.input));
+    const valYArr: (number | number[])[] = validationData.map((d: any) => d.actual);
+    const isSparse = typeof valYArr[0] === 'number';
+
+    const valX = tf.tensor2d(valXArr);
+    const predictions = modelResult.model.predict(valX) as tf.Tensor;
+    const predClasses = predictions.argMax(-1);
+    const actualClasses = isSparse
+      ? tf.tensor1d(valYArr as number[], 'int32')
+      : tf.tensor2d(valYArr as number[][]).argMax(-1);
+
+    const predArray = (predClasses.arraySync() as number[]);
+    const actualArray = (actualClasses.arraySync() as number[]);
+
+    const accuracy = predArray.reduce((acc, p, i) => acc + (p === actualArray[i] ? 1 : 0), 0) / predArray.length;
+
+    const classes = Array.from(new Set(actualArray.concat(predArray)));
+    let precisionSum = 0;
+    let recallSum = 0;
+    classes.forEach((c) => {
+      let tp = 0, fp = 0, fn = 0;
+      for (let i = 0; i < predArray.length; i++) {
+        if (predArray[i] === c && actualArray[i] === c) tp++;
+        else if (predArray[i] === c && actualArray[i] !== c) fp++;
+        else if (predArray[i] !== c && actualArray[i] === c) fn++;
+      }
+      const precision = tp / Math.max(1, tp + fp);
+      const recall = tp / Math.max(1, tp + fn);
+      precisionSum += precision;
+      recallSum += recall;
+    });
+    const precision = precisionSum / classes.length;
+    const recall = recallSum / classes.length;
+    const f1Score = (2 * precision * recall) / Math.max(1e-8, precision + recall);
+
+    valX.dispose();
+    predictions.dispose();
+    predClasses.dispose();
+    actualClasses.dispose();
+
+    const validationMetrics = { accuracy, precision, recall, f1Score, samples: valXArr.length };
 
     return {
       ...trainingResult,
@@ -481,7 +553,7 @@ export class ContinuousLearningSystem extends EventEmitter {
 
     this.emit('model-updated', modelUpdate);
 
-    this.feedbackSystem.addFeedbackMessage({
+    this.feedbackSystem.publishFeedbackMessage({
       id: `model-update-${Date.now()}`,
       type: 'info',
       category: 'model',
@@ -517,7 +589,7 @@ export class ContinuousLearningSystem extends EventEmitter {
   private processEvaluationResult(evaluation: any): void {
     // 处理模型评估结果
     if (evaluation.accuracy < 0.8) {
-      this.feedbackSystem.addFeedbackMessage({
+      this.feedbackSystem.publishFeedbackMessage({
         id: `low-accuracy-${Date.now()}`,
         type: 'warning',
         category: 'accuracy',
@@ -539,7 +611,7 @@ export class ContinuousLearningSystem extends EventEmitter {
   private processPerformanceData(data: any): void {
     // 处理性能数据
     if (data.inferenceTime > 1000) { // 超过1秒
-      this.feedbackSystem.addFeedbackMessage({
+      this.feedbackSystem.publishFeedbackMessage({
         id: `slow-inference-${Date.now()}`,
         type: 'warning',
         category: 'performance',
@@ -618,5 +690,21 @@ export class ContinuousLearningSystem extends EventEmitter {
 
   public getConfiguration(): LearningConfiguration {
     return { ...this.configuration };
+  }
+  private async adaptModel(dataBatch: LearningData[]): Promise<void> {
+    const processed = dataBatch.map(d => ({
+      ...d,
+      input: this.addNoiseToInput(d.input)
+    }));
+
+    const trainingResult = await this.trainModel(processed);
+    const validationResult = await this.validateModel(trainingResult);
+    if (this.shouldDeployNewModel(validationResult)) {
+      await this.deployNewModel(validationResult);
+    }
+    this.emit('immediate-learning-completed', {
+      iteration: this.trainingIteration,
+      result: validationResult
+    });
   }
 }

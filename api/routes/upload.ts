@@ -87,8 +87,10 @@ function validateImageQuality(buffer: Buffer): { valid: boolean; issues: string[
   };
 }
 
+type UploadRequest = express.Request & { file?: any };
+
 // 上传图像接口
-router.post('/upload', upload.single('image'), async (req, res) => {
+router.post('/upload', upload.single('image'), async (req: UploadRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -150,9 +152,9 @@ router.get('/analysis/:imageId', async (req, res) => {
     // 将图像转换为 ImageData 供疾病分析使用
     const sharpImage = sharp(stored);
     const { data: rawData, info } = await sharpImage.raw().toBuffer({ resolveWithObject: true });
-    const imageData = new ImageData(new Uint8ClampedArray(rawData), info.width, info.height);
+    const raw = { data: new Uint8ClampedArray(rawData), width: info.width!, height: info.height! };
     // 执行疾病分析（真实图像）
-    const diseaseAnalysis = await diseaseAnalysisService.analyzeDisease(imageData, detection.teeth);
+    const diseaseAnalysis = await diseaseAnalysisService.analyzeDisease(raw, detection.teeth);
     
     // 组合分析结果
     const analysisResult = {

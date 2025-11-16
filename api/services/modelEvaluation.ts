@@ -58,7 +58,7 @@ export class ModelEvaluationService extends EventEmitter {
       // 执行模型推理
       const predictions = model.predict(tf.stack(testData)) as tf.Tensor;
       const predictedClasses = predictions.argMax(-1);
-      const actualClasses = labels.argMax(-1);
+      const actualClasses = tf.stack(labels).argMax(-1);
       
       // 计算基础指标
       const accuracy = this.calculateAccuracy(predictedClasses, actualClasses);

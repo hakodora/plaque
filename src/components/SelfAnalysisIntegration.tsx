@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Brain, TrendingUp, AlertCircle, CheckCircle, 
   Clock, Zap, Settings, Play, Pause, RotateCcw,
-  BarChart3, Activity, Cpu, Memory, Eye
+  BarChart3, Activity, Cpu, Eye, Info, Database
 } from 'lucide-react';
 import PerformanceDashboard from './PerformanceDashboard';
 import Enhanced3DVisualization from './Enhanced3DVisualization';
@@ -21,7 +21,7 @@ export default function SelfAnalysisIntegration({
   feedbackSystem,
   continuousLearning
 }: SelfAnalysisIntegrationProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'visualization' | 'feedback' | 'learning'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'visualization' | 'feedback' | 'learning'>('visualization');
   const [isSystemActive, setIsSystemActive] = useState(false);
   const [systemStatus, setSystemStatus] = useState({
     performance: { status: 'healthy', score: 95 },
@@ -133,8 +133,9 @@ export default function SelfAnalysisIntegration({
     
     // 基于响应时间扣分
     if (report.operations) {
-      const avgResponseTime = Object.values(report.operations as any)
-        .reduce((sum: number, op: any) => sum + op.avgDuration, 0) / Object.keys(report.operations).length;
+      const durations = Object.values(report.operations as Record<string, any>);
+      const total = (durations as any[]).reduce((sum: number, op: any) => sum + Number(op?.avgDuration || 0), 0);
+      const avgResponseTime = total / Math.max(1, Object.keys(report.operations).length);
       
       if (avgResponseTime > 1000) score -= 20;
       else if (avgResponseTime > 500) score -= 10;
@@ -151,7 +152,7 @@ export default function SelfAnalysisIntegration({
     if (!evaluations || evaluations.length === 0) return 0;
     
     const recentEvaluations = evaluations.slice(-10);
-    const avgAccuracy = recentEvaluations.reduce((sum, eval) => sum + eval.accuracy, 0) / recentEvaluations.length;
+    const avgAccuracy = recentEvaluations.reduce((sum, entry) => sum + entry.accuracy, 0) / recentEvaluations.length;
     
     return Math.round(avgAccuracy * 100);
   };
@@ -370,7 +371,7 @@ export default function SelfAnalysisIntegration({
                 <p className="text-sm font-medium text-gray-600">内存优化</p>
                 <p className="text-2xl font-bold text-gray-900">-{optimizationMetrics.memoryReduction.toFixed(1)}%</p>
               </div>
-              <Memory className="w-8 h-8 text-purple-500" />
+              <Database className="w-8 h-8 text-purple-500" />
             </div>
           </div>
         </div>

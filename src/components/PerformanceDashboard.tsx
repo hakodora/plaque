@@ -16,7 +16,7 @@ import {
 } from 'chart.js';
 import { 
   Activity, TrendingUp, TrendingDown, AlertCircle, 
-  CheckCircle, Clock, Memory, Cpu, Database, Zap,
+  CheckCircle, Clock, Cpu, Database, Zap,
   BarChart3, PieChart, Radar as RadarIcon, Eye
 } from 'lucide-react';
 
@@ -217,7 +217,7 @@ export default function PerformanceDashboard({ performanceMonitor, modelEvaluato
                   {realTimeMetrics ? (realTimeMetrics.memory.heapUsed / 1024 / 1024).toFixed(0) : 0} MB
                 </p>
               </div>
-              <Memory className="w-8 h-8 text-green-500" />
+              <Database className="w-8 h-8 text-green-500" />
             </div>
             <div className="mt-4">
               <div className="w-full bg-gray-200 rounded-full h-2">
